@@ -13,5 +13,6 @@ namespace YAFF.Models
 
         }
         public DbSet<OutputModel> MediaItems { get; set; }
+        public DbSet<FormFileModel> FileItems { get; set; }
     }
 }

@@ -15,47 +15,33 @@ namespace YAFF.Controllers
     public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
-        private readonly MediaContext _context;
+        
 
         public HomeController(ILogger<HomeController> logger, MediaContext context)
         {
             _logger = logger;
-            _context = context;
         }
-        [HttpPost]
-        public async Task<IActionResult> SubmitMedia(int id, IFormFile file)
-        {
-            //TODO
-            //https://stackoverflow.com/questions/3877448/asp-net-mvc-passing-model-together-with-files-back-to-controller
-            //https://stackoverflow.com/questions/1653469/how-can-i-upload-a-file-and-save-it-to-a-stream-for-further-preview-using-c/1653508#1653508
-            //https://stackoverflow.com/questions/51021182/httppostedfilebase-in-asp-net-core-2-0/51021836
+        //[HttpPost]
+        //public async Task<IActionResult> SubmitMedia(int id, IFormFile file)
+        //{
+        //    //TODO
+        //    //https://stackoverflow.com/questions/3877448/asp-net-mvc-passing-model-together-with-files-back-to-controller
+        //    //https://stackoverflow.com/questions/1653469/how-can-i-upload-a-file-and-save-it-to-a-stream-for-further-preview-using-c/1653508#1653508
+        //    //https://stackoverflow.com/questions/51021182/httppostedfilebase-in-asp-net-core-2-0/51021836
             
-            var filePath = Path.GetTempFileName();
-            //TODO now alter OutputModel with id to point to the file's location, or bind id to file somehow
-            if (file.Length > 0)
-            {
-                using(var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
-            }
+        //    var filePath = Path.GetTempFileName();
+        //    //TODO now alter OutputModel with id to point to the file's location, or bind id to file somehow
+        //    if (file.Length > 0)
+        //    {
+        //        using(var stream = new FileStream(filePath, FileMode.Create))
+        //        {
+        //            await file.CopyToAsync(stream);
+        //        }
+        //    }
 
-            return Ok(filePath);
-        }
-        [HttpPost]
-        public async Task<ActionResult<OutputModel>> PostOutputData(string name, string extension)
-        {
-            //TODO...is this the best way of doing this, or can i pass in a full item somehow?
-            var item = new OutputModel()
-            {
-                OutputName = name,
-                OutputExtension = extension
-            };
-            _context.MediaItems.Add(item);
-            await _context.SaveChangesAsync();
-            //return CreatedAtAction(nameof(GetTodoItem), new { id = todoItem.Id }, todoItem;
-            return CreatedAtAction("Wow!", new { id = item.ID }, item);
-        }
+        //    return Ok(filePath);
+        //}
+        
 
         public IActionResult Index()
         {

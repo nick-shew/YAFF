@@ -7,7 +7,7 @@ namespace YAFF.Models
 {
     public class OutputModel
     {
-        public string ID { get; set; }
+        public long ID { get; set; }
         public string OutputName { get; set; }
         public string OutputExtension { get; set; }
     }
