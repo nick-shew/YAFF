@@ -33,72 +33,38 @@ function updateTextAndVal(element, value) {
     element.val(value)
 }
 
-function postFileToWebRoot() {
-    //maybe make better use of forms lol
+function convertFile() {
     var fdata = new FormData()
-    fdata.append("file", $("#submitFile")[0].files[0])
+    fdata.append("data", $("#submitFile")[0].files[0])
+    fdata.append("outName", $("#submitOutName").val() + $("#submitExt").val())
+    fdata.append("inName", $("#submitFile")[0].files[0].name)
     $.ajax({
-        url: "api/File/",
+        cache: false,
+        url: 'api/Media/PostFile',
         type: "POST",
         data: fdata,
         processData: false,
         contentType: false,
         success: function (data) {
-            //TODO somehow await processing of file then do a nice little GET and serve the file. easy
-            console.log('upload complete!')
+            console.log('Retrieving processed file...')
+            //var response = JSON.parse(data)
+            var response = data
+            console.log(response)
+            console.log(response.fileGuid)
+            var location = 'api/Media/Download?fileGuid=' + response.fileGuid
+                + '&filename=' + response.fileName
+            console.log(location)
+            if (response.fileName != null && response.fileGuid != null) {
+                window.location = location
+            }
         },
         error: function (data) {
-            alert(`Error creating database record! File not uploaded. ${data.status}: ${data.statusText}`)
             console.log(data.responseText)
-            //TODO delete the output info
         }
     })
 }
-
-function postFileToDb() {
-    //https://stackoverflow.com/questions/21060247/send-formdata-and-string-data-together-through-jquery-ajax
-    //https://docs.microsoft.com/en-us/aspnet/core/mvc/models/file-uploads?view=aspnetcore-3.1
-    var fdata = new FormData()
-    fdata.append("file", $("#submitFile")[0].files[0])
-    $.ajax({
-        url: "api/File/",
-        type: "POST",
-        data: fdata,
-        processData: false,
-        contentType: false,
-        success: function (data) {
-            //TODO somehow await processing of file then do a nice little GET and serve the file. easy
-            console.log('upload complete!')
-        },
-        error: function (data) {
-            alert(`Error creating database record! File not uploaded. ${data.status}: ${data.statusText}`)
-            console.log(data.responseText)
-            //TODO delete the output info
-        }
-    })
-}
-
 
 $("#submitButton").click(function () {
     console.log(`submitting record for file: ${$("#submitOutName").val() + $("#submitExt").val()}`)
-    //TODO...this part isnt working
-    $.ajax({
-        url: "api/Media/",
-        type: "POST",
-        data: JSON.stringify({
-            "outputName": $("#submitOutName").val(),
-            "outputExtension": $("#submitExt").val(),
-        }),
-        contentType: "application/json; charset=utf-8",
-        success: function (data) {
-            console.log(data)
-            console.log(`Record submitted for ID ${data.id}! Now posting file...`)
-            //TODO--now that table record has been created, do another POST for the file itself--somehow get the ID incorporated there
-            
-        },
-        error: function (data) {
-            alert(`Error creating database record! Info not uploaded. ${data.status}: ${data.statusText}`)
-            console.log(data.responseText)
-        }
-    })
+    convertFile()
 })

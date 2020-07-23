@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using YAFF.Models;
@@ -15,136 +16,111 @@ namespace YAFF.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    //TODO...refactor to use Media and OutputItem less interchangeably
     public class MediaController : Controller
     {
         private readonly ILogger<MediaController> _logger;
-        private readonly MediaContext _context;
         private readonly IWebHostEnvironment _hostEnvironment;
-        public MediaController(ILogger<MediaController> logger, MediaContext context, IWebHostEnvironment hostEnvironment)
+        public MediaController(ILogger<MediaController> logger, IWebHostEnvironment hostEnvironment)
         {
             _logger = logger;
-            _context = context;
             _hostEnvironment = hostEnvironment;
         }
-        [HttpGet("{id}")]
-        public async Task<ActionResult<OutputModel>> GetOutputInfo(long id)
+        [HttpGet]
+        [Route("Download")]
+        public async Task<ActionResult> Download(string fileGuid, string fileName)
         {
-            var mediaItem = await _context.MediaItems.FindAsync(id);
+            var outPath = getOutputPath(fileGuid);
 
-            if (mediaItem == null)
+            if (new FileExtensionContentTypeProvider().TryGetContentType(outPath, out string contentType))
             {
-                return NotFound();
+                byte[] data;
+                using (var stream = System.IO.File.OpenRead(outPath))
+                {
+                    //there's probably some way to do this without storing everything in memory
+                    data = new byte[stream.Length];
+                    await stream.ReadAsync(data);
+                }
+                var result = File(data, contentType, fileName);
+                //clean up file
+                System.IO.File.Delete(outPath);
+                return result;
             }
-
-            return mediaItem;
+            else
+            {
+                //something's fishy with the contentType
+                System.IO.File.Delete(outPath);
+                return StatusCode(500);
+            }
         }
-        // POST for initial record creation
         [HttpPost]
-        //[ValidateAntiForgeryToken]
-        public async Task<ActionResult<OutputModel>> PostOutputModel(OutputModel item)
+        [Route("PostFile")]
+        public async Task<IActionResult> PostFile([FromForm]MediaModel media)
         {
-            _logger.LogDebug("Posting outputmodel");
-            _context.MediaItems.Add(item);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetOutputInfo), new { id = item.ID }, item);
-        }
-        //public async Task<ActionResult<OutputModel>> PostFile(IFormFile item)
-        //{
-        //    //TODO validate file types and return BadRequest
-        //    //save to wwwroot/media
-        //    var uploadPath = Path.Combine(_hostEnvironment.WebRootPath);
-        //    var fullPath = Path.Combine(uploadPath, item.FileName);
-        //    using (var fs = new FileStream(fullPath, FileMode.Create))
-        //    {
-        //        await item.CopyToAsync(fs);
-        //    }
-        //    //do we want to upload this to DB?
-        //    _context.FileItems.Add(item);
-        //    await _context.SaveChangesAsync();
-        //    return CreatedAtAction(nameof(GetOutputInfo), new { id = item.ID }, item);
-        //}
-        
-        //[HttpPost]
-        //public IActionResult PostFile()
-        //https://stackoverflow.com/questions/49756601/how-to-upload-file-from-ajax-to-asp-net-core-controller
-        //{
-        //    var file = HttpContext.Request.Form.Files[0];
-        //    return Ok();
-        //}
+            //https://stackoverflow.com/questions/18142992/creating-temporary-files-in-wwroot-folder-asp-net-mvc3
+            //TODO add progress indicator
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutOutputModel(long id, OutputModel todoItem)
+            //validate contents
+            //TODO check for large file size
+            //TODO check for weird file names
+            //prevent skulduggery w paths in filename
+            media.InName = Path.GetFileName(media.InName);
+            media.OutName = Path.GetFileName(media.OutName);
+            //check for empty file
+            if (media.Data.Length == 0)
+            {
+                return StatusCode(400);
+            }
+
+            //store files in wwwroot so we can use ffmpeg
+            //TODO is this kosher?
+            var wrp = _hostEnvironment.WebRootPath;
+            var uploadPath = Path.Combine(wrp, "uploads");
+            var inPath = Path.Combine(uploadPath, media.InName);
+
+            using (var stream = System.IO.File.Create(inPath))
+            {
+                //await stream.WriteAsync(media.Data);//for byte[]
+                await media.Data.CopyToAsync(stream);//for IFF
+            }
+
+            //write output to guid file
+            var outExt = Path.GetExtension(media.OutName);
+            var guid = Guid.NewGuid().ToString() + outExt;
+            var outPath = getOutputPath(guid);
+            //do ffmpeg thing
+            var success = await RunFFMpeg(inPath, outPath);
+            if (!success)
+            {
+                return StatusCode(500);
+            }
+            //clean up original file
+            System.IO.File.Delete(inPath);
+            //now...return info needed for download request
+            return new JsonResult(new { FileGuid = guid, FileName = $"{media.OutName}" });
+        }
+        private async Task<bool> RunFFMpeg(string inPath, string outPath)
         {
-            if (id != todoItem.ID)
+            //run ffmpeg on file
+            var proStartInfo = new ProcessStartInfo
             {
-                return BadRequest();
-            }
-
-            _context.Entry(todoItem).State = EntityState.Modified;
-
-            try
+                FileName = "ffmpeg.exe",
+                Arguments = $@"-i ""{inPath}"" ""{outPath}"""
+            };
+            var pro = new Process
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!OutputItemExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+                StartInfo = proStartInfo
+            };
+            await Task.Run(()=>pro.Start());
+            pro.WaitForExit();
+            //any exit code other than 0 means there was an error
+            return pro.ExitCode == 0;
         }
-
-        // GET: MediaController/Edit/5
-        //public ActionResult Edit(int id)
-        //{
-        //    return View();
-        //}
-
-        //// POST: MediaController/Edit/5
-        //[HttpPost]
-        //[ValidateAntiForgeryToken]
-        //public ActionResult Edit(int id, IFormCollection collection)
-        //{
-        //    try
-        //    {
-        //        return RedirectToAction(nameof(Index));
-        //    }
-        //    catch
-        //    {
-        //        return View();
-        //    }
-        //}
-
-        //// GET: MediaController/Delete/5
-        //public ActionResult Delete(int id)
-        //{
-        //    return View();
-        //}
-
-        //// POST: MediaController/Delete/5
-        //[HttpPost]
-        //[ValidateAntiForgeryToken]
-        //public ActionResult Delete(int id, IFormCollection collection)
-        //{
-        //    try
-        //    {
-        //        return RedirectToAction(nameof(Index));
-        //    }
-        //    catch
-        //    {
-        //        return View();
-        //    }
-        //}
-
-        private bool OutputItemExists(long id) =>
-             _context.MediaItems.Any(e => e.ID == id);
+        private string getOutputPath(string fileName)
+        {
+            var wrp = _hostEnvironment.WebRootPath;
+            var outputPath = Path.Combine(wrp, "output");
+           return Path.Combine(outputPath, fileName);
+        }
+        //TODO--delete all files on session end
     }
 }
