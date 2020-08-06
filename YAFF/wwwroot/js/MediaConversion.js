@@ -1,4 +1,12 @@
-﻿//Acceptable file extensions
+﻿var subtitles = [
+    "It's so easy to use",
+    "You like it?",
+    "Wow!",
+    "Doesn't mine crypto in the background like the one I used to use",
+    "DO NOT Google \"audio file converter\"",
+]
+
+//Acceptable file extensions
 var extensions = [
     ".mp3",
     ".wav",
@@ -6,11 +14,15 @@ var extensions = [
     ".ogg",
     ".aiff"
 ]
-var htmlExtensions = ""
-extensions.forEach(item => htmlExtensions = htmlExtensions.concat(`<a class="dropdown-item" href="#">${item}</a>`))
-$("#submitExtDropdown").html(htmlExtensions)
 
-//TODO remove console logging as necessary
+$(document).ready(function () {
+    //populate file extension dropdown
+    var htmlExtensions = ""
+    extensions.forEach(item => htmlExtensions = htmlExtensions.concat(`<a class="dropdown-item" href="#">${item}</a>`))
+    $("#submitExtDropdown").html(htmlExtensions)
+    //populate subtitle
+    $("#subtitle").html(subtitles[Math.floor(Math.random() * subtitles.length)])
+})
 
 //when file is uploaded, allow use of dropdown, and prepopulate filename
 //TODO maybe hide the rest of the UI
@@ -18,7 +30,7 @@ $("#submitFile").on("change", function () {
     if ($("#submitFile").val()) {
         $("#submitExt").removeAttr("disabled")
         $("#submitOutName").val($("#submitFile").val().replace(/\.[^/.]+$/, "").replace(/^.*[\\\/]/, ''))//TODO this is definitely not the best way of doing this
-        updateTextAndVal($("#submitExt"), ".mp3") //DEBUG set to .mp3 by default
+        updateTextAndVal($("#submitExt"), ".mp3") //set to .mp3 by default
     }
 })
 
@@ -28,7 +40,6 @@ $("#submitExtDropdown a").on("click", function () {
 });
 
 $("#submitButton").click(function () {
-    console.log(`submitting record for file: ${$("#submitOutName").val() + $("#submitExt").val()}`)
     if (!$("#submitButton").hasClass("disabled")) {
         convertFile()
     }

@@ -36,12 +36,11 @@ namespace YAFF.Controllers
             _logger = logger;
             _hostEnvironment = hostEnvironment;
         }
-        //TODO robustify logging
         [HttpGet]
         [Route("Download")]
-        public async Task<ActionResult> Download(string fileGuid, string fileName)
+        public ActionResult Download(string fileGuid, string fileName)
         {
-            //TODO not really any reason to make this async
+            _logger.LogDebug($"Download request received for {fileName}, GUID: {fileGuid}");
             var outPath = GetOutputPath(fileGuid);
 
             if (new FileExtensionContentTypeProvider().TryGetContentType(outPath, out string contentType))
@@ -51,7 +50,7 @@ namespace YAFF.Controllers
                 {
                     //there's probably some way to do this without storing everything in memory
                     data = new byte[stream.Length];
-                    await stream.ReadAsync(data);
+                    stream.Read(data);
                 }
                 var result = File(data, contentType, fileName);
                 //clean up file
@@ -61,6 +60,7 @@ namespace YAFF.Controllers
             else
             {
                 //something's fishy with the contentType
+                _logger.LogError($"Couldn't infer content type for {fileName}, aborting...");
                 System.IO.File.Delete(outPath);
                 return StatusCode(500);
             }
@@ -69,11 +69,10 @@ namespace YAFF.Controllers
         [Route("PostFile")]
         public async Task<IActionResult> PostFile([FromForm] MediaModel media)
         {
-            //https://stackoverflow.com/questions/18142992/creating-temporary-files-in-wwroot-folder-asp-net-mvc3
-
             //validate contents
             //TODO check for weird file names...i've read core 3.1 should be dealing with this automatically now but validate this
-            //TODO maybe return more than status codes lol
+            //TODO check MIME types!!
+            _logger.LogDebug($"Beginning file conversion for {media.InName} -> {media.OutName}");
 
             //prevent skulduggery w paths in filename
             media.InName = Path.GetFileName(media.InName);
@@ -119,28 +118,17 @@ namespace YAFF.Controllers
                 System.IO.File.Delete(outPath);
                 return StatusCode(500);
             }
-            
+            _logger.LogDebug($"File conversion succeeded! Returning {media.OutName} with GUID: {guid}");
             //now...return info needed for download request
             return new JsonResult(new { FileGuid = guid, FileName = $"{media.OutName}" });
         }
         private bool RunFFMpeg(string inPath, string outPath)
         {
-            //TODO--add a progress bar specifically for this part since it takes the longest
-            //https://stackoverflow.com/questions/747982/can-ffmpeg-show-a-progress-bar
-            //https://stackoverflow.com/questions/11441517/ffmpeg-progress-bar-encoding-percentage-in-php
-            //TODO--is it stupid to make this async? https://www.pluralsight.com/guides/advanced-tips-using-task-run-async-wait
-            //duhhhh
-            //https://stackoverflow.com/questions/29680391/ffmpeg-command-line-write-output-to-a-text-file
-            //var progressName = Path.GetFileNameWithoutExtension(outPath);
-            //var progressPath = GetOutputPath(progressName + ".txt");
-            //var progressPath = "output.txt";
-            //System.IO.File.Create(progressPath);
-            //_logger.LogDebug(progressPath);
+            //no longer async as per https://www.pluralsight.com/guides/advanced-tips-using-task-run-async-wait
 
             var proStartInfo = new ProcessStartInfo
             {
                 FileName = "ffmpeg.exe",
-                //Arguments = $@"-i ""{inPath}"" ""{outPath}"" > ""{progressPath}""",//TODO come on...alternative is write stream output to file in real time
                 Arguments = $@"-i ""{inPath}"" ""{outPath}""",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -150,21 +138,13 @@ namespace YAFF.Controllers
             {
                 StartInfo = proStartInfo
             };
-            //TODO this is either not working or everything is being written to StandardError
-            pro.OutputDataReceived += new DataReceivedEventHandler((sender, e) =>
-            {
-                if (!String.IsNullOrEmpty(e.Data))
-                {
-                    _logger.LogDebug(e.Data);
-                }
-            });
+
             pro.Start();
             //capture errors
             var proErrorStream = pro.StandardError;
             var proErrors = proErrorStream.ReadToEnd();//think this might be capturing all output actually
 
             pro.WaitForExit();
-            //System.IO.File.Delete(progressPath);
             
             //any exit code other than 0 means there was an error
             if (pro.ExitCode != 0)
