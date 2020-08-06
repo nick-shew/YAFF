@@ -29,7 +29,9 @@ $(document).ready(function () {
 $("#submitFile").on("change", function () {
     if ($("#submitFile").val()) {
         $("#submitExt").removeAttr("disabled")
+        //make the default output file name the same as the input file, but without the extension
         $("#submitOutName").val($("#submitFile").val().replace(/\.[^/.]+$/, "").replace(/^.*[\\\/]/, ''))//TODO this is definitely not the best way of doing this
+        //TODO...make default value contextual?
         updateTextAndVal($("#submitExt"), ".mp3") //set to .mp3 by default
     }
 })
@@ -37,6 +39,9 @@ $("#submitFile").on("change", function () {
 //when dropdown element is clicked, update the text for the button
 $("#submitExtDropdown a").on("click", function () {
     updateTextAndVal($("#submitExt"), $(this).text())
+    if ($("#submitButton").hasClass("disabled")) {
+        $("#submitButton").removeClass("disabled")
+    }
 });
 
 $("#submitButton").click(function () {
@@ -57,7 +62,7 @@ function convertFile() {
     fdata.append("outName", $("#submitOutName").val() + $("#submitExt").val())
     fdata.append("inName", $("#submitFile")[0].files[0].name)
     showAlert("Your file is being converted.", "Converting...")//TODO maybe replace this with progress bar if this takes forever after deployment
-    $("#submitButton").addClass("disabled")//TODO reinforce this on server if need be
+    $("#submitButton").addClass("disabled")
     $.ajax({
         cache: false,
         url: 'api/Media/PostFile',

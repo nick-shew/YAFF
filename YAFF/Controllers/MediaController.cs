@@ -67,11 +67,11 @@ namespace YAFF.Controllers
         }
         [HttpPost]
         [Route("PostFile")]
-        public async Task<IActionResult> PostFile([FromForm] MediaModel media)
+        public IActionResult PostFile([FromForm] MediaModel media)
         {
             //validate contents
-            //TODO check for weird file names...i've read core 3.1 should be dealing with this automatically now but validate this
-            //TODO check MIME types!!
+            //TODO handle international file names...i've read core 3.1 should be dealing with this automatically now but validate this
+            //TODO check actual MIME type
             _logger.LogDebug($"Beginning file conversion for {media.InName} -> {media.OutName}");
 
             //prevent skulduggery w paths in filename
@@ -92,15 +92,24 @@ namespace YAFF.Controllers
                 return StatusCode(400);
             }
 
+
             //store files in wwwroot so we can use ffmpeg easily...no database io needed (?)
             var wrp = _hostEnvironment.WebRootPath;
             var uploadPath = Path.Combine(wrp, "uploads");
             var inPath = Path.Combine(uploadPath, media.InName);
 
+            //prevent submission spamming
+            if (System.IO.File.Exists(inPath))
+            {
+                LogErrorDebugInfo(media, true);
+                _logger.LogError("File is already being converted!");
+                return StatusCode(400);
+            }
+
             using (var stream = System.IO.File.Create(inPath))
             {
                 //await stream.WriteAsync(media.Data);//for byte[]
-                await media.Data.CopyToAsync(stream);//for IFF
+                media.Data.CopyTo(stream);//for IFF
             }
 
             //write output to guid file
@@ -109,7 +118,7 @@ namespace YAFF.Controllers
             var outPath = GetOutputPath(guid);
             //do ffmpeg thing
             var success = RunFFMpeg(inPath, outPath);
-            //clean up original uploaded file
+            //regardless of success, clean up original uploaded file
             System.IO.File.Delete(inPath);
             if (!success)
             {
