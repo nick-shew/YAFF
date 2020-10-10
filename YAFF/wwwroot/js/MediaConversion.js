@@ -25,7 +25,6 @@ $(document).ready(function () {
 })
 
 //when file is uploaded, allow use of dropdown, and prepopulate filename
-//TODO maybe hide the rest of the UI
 $("#submitFile").on("change", function () {
     if ($("#submitFile").val()) {
         $("#submitExt").removeAttr("disabled")
@@ -61,7 +60,7 @@ function convertFile() {
     fdata.append("data", $("#submitFile")[0].files[0])
     fdata.append("outName", $("#submitOutName").val() + $("#submitExt").val())
     fdata.append("inName", $("#submitFile")[0].files[0].name)
-    showAlert("Your file is being converted.", "Converting...")//TODO maybe replace this with progress bar if this takes forever after deployment
+    showAlert("Your file is being converted.", "Converting...")
     $("#submitButton").addClass("disabled")
     $.ajax({
         cache: false,
@@ -74,11 +73,10 @@ function convertFile() {
             //file upload and conversion worked! now ask for the converted file
             var location = 'api/Media/Download?fileGuid=' + data.fileGuid
                 + '&filename=' + data.fileName
-            console.log(location)
             if (data.fileName != null && data.fileGuid != null) {
                 window.location.href = location
             }
-            showAlert("Your file should be available shortly.","Conversion successful!","alert-success")//TODO add direct link if necessary
+            showAlert(`Your file should be available shortly.`, "Conversion successful!", "alert-success")//TODO add direct link if necessary...this would require reworking dl method though
         },
         error: function (data) {
             console.log(data.responseText)
