@@ -6,3 +6,4 @@
 ## Limitations
 * This currently works only for audio files, with no parameter tweaking supported (yet).
 * Max file size is 28.6MB because of IIS.
+* Uses default styling 😔
